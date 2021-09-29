@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['screenidx',['screenIdx',['../classglDisplay.html#a987e05d68219418d2d232665d92cc1a2',1,'glDisplay']]],
-  ['size',['size',['../structtensorNet_1_1outputLayer.html#ab5c8d8f6651c9696cf5e4b15e7dc1d80',1,'tensorNet::outputLayer']]]
+  ['name',['name',['../structtensorNet_1_1layerInfo.html#a3a361b4591cb1be7c1db37804d2ea405',1,'tensorNet::layerInfo::name()'],['../structnetworkAdapter__t.html#ac6b4bed1cbd995eb103dac32f547ba20',1,'networkAdapter_t::name()']]],
+  ['numbuffers',['numBuffers',['../structvideoOptions.html#a65b80ddd3f3cf0940f18e365fb58270b',1,'videoOptions']]],
+  ['numglyphs',['NumGlyphs',['../classcudaFont.html#af5e63c78f2487b7e37abaaa7d1ebc291',1,'cudaFont']]],
+  ['numlinks',['numLinks',['../structposeNet_1_1Topology.html#a6f698d5f9cfeb8e50bada255c03a063b',1,'poseNet::Topology']]]
 ];

@@ -34,8 +34,8 @@ __global__ void gpuDetectionOverlay( T* input, T* output, int width, int height,
 	if( x >= width || y >= height )
 		return;
 
-	const T px_in = input[ y * width + x ];
-	T px_out = px_in;
+	const int px_idx = y * width + x;
+	T px = input[px_idx];
 	
 	const float fx = x;
 	const float fy = y;
@@ -52,13 +52,13 @@ __global__ void gpuDetectionOverlay( T* input, T* output, int width, int height,
 			const float alpha = color.w / 255.0f;
 			const float ialph = 1.0f - alpha;
 
-			px_out.x = alpha * color.x + ialph * px_out.x;
-			px_out.y = alpha * color.y + ialph * px_out.y;
-			px_out.z = alpha * color.z + ialph * px_out.z;
+			px.x = alpha * color.x + ialph * px.x;
+			px.y = alpha * color.y + ialph * px.y;
+			px.z = alpha * color.z + ialph * px.z;
 		}
 	}
 	
-	output[y * width + x] = px_out;	 
+	output[px_idx] = px;	 
 }
 
 
@@ -95,29 +95,18 @@ cudaError_t launchDetectionOverlay( T* input, T* output, uint32_t width, uint32_
 	if( !input || !output || width == 0 || height == 0 || !detections || numDetections == 0 || !colors )
 		return cudaErrorInvalidValue;
 			
-	// if input and output are the same image, then we can use the faster method
-	// which draws 1 box per kernel, but doesn't copy pixels that aren't inside boxes
-	if( input == output )
+	// this assumes that the output already has the input image copied to it,
+	// which if input != output, is done first by detectNet::Detect()
+	for( int n=0; n < numDetections; n++ )
 	{
-		for( int n=0; n < numDetections; n++ )
-		{
-			const int boxWidth = (int)detections[n].Width();
-			const int boxHeight = (int)detections[n].Height();
+		const int boxWidth = (int)detections[n].Width();
+		const int boxHeight = (int)detections[n].Height();
 
-			// launch kernel
-			const dim3 blockDim(8, 8);
-			const dim3 gridDim(iDivUp(boxWidth,blockDim.x), iDivUp(boxHeight,blockDim.y));
-
-			gpuDetectionOverlayBox<T><<<gridDim, blockDim>>>(input, output, width, height, (int)detections[n].Left, (int)detections[n].Top, boxWidth, boxHeight, colors[detections[n].ClassID]); 
-		}
-	}
-	else
-	{
 		// launch kernel
 		const dim3 blockDim(8, 8);
-		const dim3 gridDim(iDivUp(width,blockDim.x), iDivUp(height,blockDim.y));
+		const dim3 gridDim(iDivUp(boxWidth,blockDim.x), iDivUp(boxHeight,blockDim.y));
 
-		gpuDetectionOverlay<T><<<gridDim, blockDim>>>(input, output, width, height, detections, numDetections, colors); 
+		gpuDetectionOverlayBox<T><<<gridDim, blockDim>>>(input, output, width, height, (int)detections[n].Left, (int)detections[n].Top, boxWidth, boxHeight, colors[detections[n].ClassID]); 
 	}
 
 	return cudaGetLastError();

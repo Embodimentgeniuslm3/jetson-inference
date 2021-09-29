@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['outputlayer',['outputLayer',['../structtensorNet_1_1outputLayer.html',1,'tensorNet']]]
+  ['objectpose',['ObjectPose',['../structposeNet_1_1ObjectPose.html',1,'poseNet']]]
 ];

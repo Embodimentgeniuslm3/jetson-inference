@@ -1,13 +1,14 @@
 var tensorNet_8h =
 [
-    [ "Logger", "classtensorNet_1_1Logger.html", null ],
+    [ "Logger", "classtensorNet_1_1Logger.html", "classtensorNet_1_1Logger" ],
     [ "Profiler", "classtensorNet_1_1Profiler.html", "classtensorNet_1_1Profiler" ],
-    [ "outputLayer", "structtensorNet_1_1outputLayer.html", "structtensorNet_1_1outputLayer" ],
+    [ "layerInfo", "structtensorNet_1_1layerInfo.html", "structtensorNet_1_1layerInfo" ],
     [ "DEFAULT_MAX_BATCH_SIZE", "group__tensorNet.html#ga5a46a965749d6118e01307fd4d4865c9", null ],
     [ "DIMS_C", "tensorNet_8h.html#a2dd230b8ba7267356e52b308b5c40077", null ],
     [ "DIMS_H", "tensorNet_8h.html#a1fc0b1785ea99bd75ec83b1eeb4e6120", null ],
     [ "DIMS_W", "tensorNet_8h.html#a7d959cb65990da8bfea3d941d6daf416", null ],
     [ "LOG_TRT", "group__tensorNet.html#ga3c048e603c3c16fb810eb11c36242f82", null ],
+    [ "NOEXCEPT", "tensorNet_8h.html#a10a59554805ac7ce3905fd3540f98137", null ],
     [ "NV_TENSORRT_MAJOR", "tensorNet_8h.html#aca5940a61fa51e91f41d88d9198bf935", null ],
     [ "NV_TENSORRT_MINOR", "tensorNet_8h.html#a7df0f049b87bee17d6aed394544e8979", null ],
     [ "Dims3", "tensorNet_8h.html#a64c8f3dfeacfa962ff9e23c586aedd1b", null ],
@@ -22,7 +23,8 @@ var tensorNet_8h =
       [ "MODEL_CUSTOM", "group__tensorNet.html#gga5d4597e0e7beae7133d542e220528725aad94b3fe48299211488aae3c133721b1", null ],
       [ "MODEL_CAFFE", "group__tensorNet.html#gga5d4597e0e7beae7133d542e220528725af850960ce09a0b0d4b38edef40e5d0e4", null ],
       [ "MODEL_ONNX", "group__tensorNet.html#gga5d4597e0e7beae7133d542e220528725a90e832c5673631bdfe24da7cd8eb52c9", null ],
-      [ "MODEL_UFF", "group__tensorNet.html#gga5d4597e0e7beae7133d542e220528725ad8c909322673d53ee28de66aa57bcccd", null ]
+      [ "MODEL_UFF", "group__tensorNet.html#gga5d4597e0e7beae7133d542e220528725ad8c909322673d53ee28de66aa57bcccd", null ],
+      [ "MODEL_ENGINE", "group__tensorNet.html#gga5d4597e0e7beae7133d542e220528725ad0f2ee11de0bfff76dace6976463556b", null ]
     ] ],
     [ "precisionType", "group__tensorNet.html#gaac6604fd52c6e5db82877390e0378623", [
       [ "TYPE_DISABLED", "group__tensorNet.html#ggaac6604fd52c6e5db82877390e0378623a1a4ed47814b2f80f0e92daad5af7bc38", null ],
@@ -45,6 +47,7 @@ var tensorNet_8h =
     ] ],
     [ "deviceTypeFromStr", "group__tensorNet.html#ga35c5a50fb1ab97a827b18012534fd7a7", null ],
     [ "deviceTypeToStr", "group__tensorNet.html#ga85c110403b6c661b4a7042fc319f39b0", null ],
+    [ "modelTypeFromPath", "group__tensorNet.html#ga675fb15bc5d4e2b8c4758c62adc6920d", null ],
     [ "modelTypeFromStr", "group__tensorNet.html#ga85f7b445f4341d24c65bb3bbc4a3204c", null ],
     [ "modelTypeToStr", "group__tensorNet.html#gae771c047f44cc49238c00d0e8af48106", null ],
     [ "precisionTypeFromStr", "group__tensorNet.html#ga70317416490f79e0150e9c4f46444116", null ],

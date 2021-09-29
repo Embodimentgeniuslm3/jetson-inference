@@ -25,8 +25,6 @@
 
 
 #include "tensorNet.h"
-#include "imageFormat.h"
-#include "commandLine.h"
 
 
 /**
@@ -60,11 +58,11 @@
 #define DETECTNET_DEFAULT_ALPHA 120
 
 /**
- * Command-line options able to be passed to imageNet::Create()
+ * Standard command-line options able to be passed to detectNet::Create()
  * @ingroup imageNet
  */
 #define DETECTNET_USAGE_STRING  "detectNet arguments: \n" 								\
-		  "  --network NETWORK     pre-trained model to load, one of the following:\n" 		\
+		  "  --network=NETWORK     pre-trained model to load, one of the following:\n" 		\
 		  "                            * ssd-mobilenet-v1\n" 							\
 		  "                            * ssd-mobilenet-v2 (default)\n" 					\
 		  "                            * ssd-inception-v2\n" 							\
@@ -75,18 +73,19 @@
 		  "                            * coco-bottle\n" 								\
 		  "                            * coco-chair\n" 								\
 		  "                            * coco-dog\n" 								\
-		  "  --model MODEL         path to custom model to load (caffemodel, uff, or onnx)\n" 					\
-		  "  --prototxt PROTOTXT   path to custom prototxt to load (for .caffemodel only)\n" 					\
-		  "  --class_labels LABELS path to text file containing the labels for each class\n" 					\
-		  "  --threshold THRESHOLD minimum threshold for detection (default is 0.5)\n"							\
-		  "  --input_blob INPUT    name of the input layer (default is '" DETECTNET_DEFAULT_INPUT "')\n" 			\
-		  "  --output_cvg COVERAGE name of the coverge output layer (default is '" DETECTNET_DEFAULT_COVERAGE "')\n" 	\
-		  "  --output_bbox BOXES   name of the bounding output layer (default is '" DETECTNET_DEFAULT_BBOX "')\n" 	\
-		  "  --mean_pixel PIXEL    mean pixel value to subtract from input (default is 0.0)\n"					\
-		  "  --batch_size BATCH    maximum batch size (default is 1)\n"										\
-            "  --alpha ALPHA         overlay alpha blending value, range 0-255 (default: 120)\n"					\
-		  "  --profile             enable layer profiling in TensorRT\n"										\
-		  "  --verbose            enable verbose output from TensorRT\n"
+		  "  --model=MODEL         path to custom model to load (caffemodel, uff, or onnx)\n" 					\
+		  "  --prototxt=PROTOTXT   path to custom prototxt to load (for .caffemodel only)\n" 					\
+		  "  --labels=LABELS       path to text file containing the labels for each class\n" 					\
+		  "  --input-blob=INPUT    name of the input layer (default is '" DETECTNET_DEFAULT_INPUT "')\n" 			\
+		  "  --output-cvg=COVERAGE name of the coverge output layer (default is '" DETECTNET_DEFAULT_COVERAGE "')\n" 	\
+		  "  --output-bbox=BOXES   name of the bounding output layer (default is '" DETECTNET_DEFAULT_BBOX "')\n" 	\
+		  "  --mean-pixel=PIXEL    mean pixel value to subtract from input (default is 0.0)\n"					\
+		  "  --batch-size=BATCH    maximum batch size (default is 1)\n"										\
+		  "  --threshold=THRESHOLD minimum threshold for detection (default is 0.5)\n"							\
+            "  --alpha=ALPHA         overlay alpha blending value, range 0-255 (default: 120)\n"					\
+		  "  --overlay=OVERLAY     detection overlay flags (e.g. --overlay=box,labels,conf)\n"					\
+		  "                        valid combinations are:  'box', 'labels', 'conf', 'none'\n"					\
+		  "  --profile             enable layer profiling in TensorRT\n\n"
 
 
 /**
@@ -176,6 +175,7 @@ public:
 		OVERLAY_BOX        = (1 << 0),	/**< Overlay the object bounding boxes */
 		OVERLAY_LABEL 	    = (1 << 1),	/**< Overlay the class description labels */
 		OVERLAY_CONFIDENCE = (1 << 2),	/**< Overlay the detection confidence values */
+		OVERLAY_DEFAULT    = OVERLAY_BOX,	/**< The default choice of overlay */
 	};
 	
 	/**
@@ -195,7 +195,12 @@ public:
 #if NV_TENSORRT_MAJOR > 4
 		SSD_MOBILENET_V1,	/**< SSD Mobilenet-v1 UFF model, trained on MS-COCO */
 		SSD_MOBILENET_V2,	/**< SSD Mobilenet-v2 UFF model, trained on MS-COCO */
-		SSD_INCEPTION_V2	/**< SSD Inception-v2 UFF model, trained on MS-COCO */
+		SSD_INCEPTION_V2,	/**< SSD Inception-v2 UFF model, trained on MS-COCO */
+		
+		/**< Default model is SSD-Mobilenet-v2 (or PedNet for legacy JetPack's) */
+		NETWORK_DEFAULT=SSD_MOBILENET_V2
+#else
+		NETWORK_DEFAULT=PEDNET_MULTI
 #endif
 	};
 
@@ -221,7 +226,7 @@ public:
 	 * @param threshold default minimum threshold for detection
 	 * @param maxBatchSize The maximum batch size that the network will support and be optimized for.
 	 */
-	static detectNet* Create( NetworkType networkType=PEDNET_MULTI, float threshold=DETECTNET_DEFAULT_THRESHOLD, 
+	static detectNet* Create( NetworkType networkType=NETWORK_DEFAULT, float threshold=DETECTNET_DEFAULT_THRESHOLD, 
 						 uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE, precisionType precision=TYPE_FASTEST, 
 						 deviceType device=DEVICE_GPU, bool allowGPUFallback=true );
 	
@@ -383,7 +388,7 @@ public:
 	 * @param output output image in CUDA device memory.
 	 * @param detections Array of detections allocated in CUDA device memory.
 	 */
-	template<typename T> bool Overlay( T* input, T* output, uint32_t width, uint32_t height, Detection* detections, uint32_t numDetections, uint32_t flags=OVERLAY_BOX )			{ return Overlay(input, output, width, height, imageFormatFromType<T>(), detections, flags); }
+	template<typename T> bool Overlay( T* input, T* output, uint32_t width, uint32_t height, Detection* detections, uint32_t numDetections, uint32_t flags=OVERLAY_DEFAULT )			{ return Overlay(input, output, width, height, imageFormatFromType<T>(), detections, flags); }
 	
 	/**
 	 * Draw the detected bounding boxes overlayed on an RGBA image.
@@ -392,7 +397,7 @@ public:
 	 * @param output output image in CUDA device memory.
 	 * @param detections Array of detections allocated in CUDA device memory.
 	 */
-	bool Overlay( void* input, void* output, uint32_t width, uint32_t height, imageFormat format, Detection* detections, uint32_t numDetections, uint32_t flags=OVERLAY_BOX );
+	bool Overlay( void* input, void* output, uint32_t width, uint32_t height, imageFormat format, Detection* detections, uint32_t numDetections, uint32_t flags=OVERLAY_DEFAULT );
 	
 	/**
 	 * Retrieve the minimum threshold for detection.

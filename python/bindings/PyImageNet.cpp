@@ -99,7 +99,7 @@ static int PyImageNet_Init( PyImageNet_Object* self, PyObject *args, PyObject *k
 				return -1;
 			}
 
-			printf(LOG_PY_INFERENCE "imageNet.__init__() argv[%zu] = '%s'\n", n, argv[n]);
+			LogDebug(LOG_PY_INFERENCE "imageNet.__init__() argv[%zu] = '%s'\n", n, argv[n]);
 		}
 
 		// load the network using (argc, argv)
@@ -139,6 +139,19 @@ static int PyImageNet_Init( PyImageNet_Object* self, PyObject *args, PyObject *k
 }
 
 
+// Deallocate
+static void PyImageNet_Dealloc( PyImageNet_Object* self )
+{
+	LogDebug(LOG_PY_INFERENCE "PyImageNet_Dealloc()\n");
+
+	// delete the network
+	SAFE_DELETE(self->net);
+	
+	// free the container
+	Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+
 #define DOC_CLASSIFY "Classify an RGBA image and return the object's class and confidence.\n\n" \
 				 "Parameters:\n" \
 				 "  image  (capsule) -- CUDA memory capsule\n" \
@@ -162,35 +175,29 @@ static PyObject* PyImageNet_Classify( PyImageNet_Object* self, PyObject* args, P
 	int width = 0;
 	int height = 0;
 
-	static char* kwlist[] = {"image", "width", "height", NULL};
+	const char* format_str = "rgba32f";
+	static char* kwlist[] = {"image", "width", "height", "format", NULL};
 
-	if( !PyArg_ParseTupleAndKeywords(args, kwds, "O|ii", kwlist, &capsule, &width, &height))
+	if( !PyArg_ParseTupleAndKeywords(args, kwds, "O|iis", kwlist, &capsule, &width, &height, &format_str))
 	{
 		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "imageNet.Classify() failed to parse args tuple");
 		printf(LOG_PY_INFERENCE "imageNet.Classify() failed to parse args tuple\n");
 		return NULL;
 	}
 
-	// verify dimensions
-	/*if( width <= 0 || height <= 0 )
-	{
-		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "imageNet.Classify() image dimensions are invalid");
-		return NULL;
-	}*/
+	// parse format string
+	imageFormat format = imageFormatFromStr(format_str);
 
 	// get pointer to image data
-	PyCudaImage* img = PyCUDA_GetImage(capsule);
+	void* ptr = PyCUDA_GetImage(capsule, &width, &height, &format);
 
-	if( !img )
-	{
-		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "imageNet.Classify() failed to get image pointer from first arg (should be cudaImage)");
+	if( !ptr )
 		return NULL;
-	}
 
 	// classify the image
 	float confidence = 0.0f;
 
-	const int img_class = self->net->Classify(img->base.ptr, img->width, img->height, img->format, &confidence);
+	const int img_class = self->net->Classify(ptr, width, height, format, &confidence);
 
 	if( img_class < 0 )
 	{
@@ -358,7 +365,7 @@ bool PyImageNet_Register( PyObject* module )
 	pyImageNet_Type.tp_methods	= pyImageNet_Methods;
 	pyImageNet_Type.tp_new		= NULL; /*PyImageNet_New;*/
 	pyImageNet_Type.tp_init		= (initproc)PyImageNet_Init;
-	pyImageNet_Type.tp_dealloc	= NULL; /*(destructor)PyImageNet_Dealloc;*/
+	pyImageNet_Type.tp_dealloc	= (destructor)PyImageNet_Dealloc;
 	pyImageNet_Type.tp_doc		= DOC_IMAGENET;
 	 
 	if( PyType_Ready(&pyImageNet_Type) < 0 )

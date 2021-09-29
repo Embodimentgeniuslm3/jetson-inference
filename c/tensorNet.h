@@ -30,6 +30,8 @@ namespace nvinfer1 { class IInt8Calibrator; }
 #include <NvInfer.h>
 
 #include <jetson-utils/cudaUtility.h>
+#include <jetson-utils/commandLine.h>
+#include <jetson-utils/imageFormat.h>
 #include <jetson-utils/timespec.h>
 #include <jetson-utils/logging.h>
 
@@ -38,14 +40,14 @@ namespace nvinfer1 { class IInt8Calibrator; }
 #include <math.h>
 
 
-#if NV_TENSORRT_MAJOR > 5
+#if NV_TENSORRT_MAJOR >= 6
 typedef nvinfer1::Dims3 Dims3;
 
 #define DIMS_C(x) x.d[0]
 #define DIMS_H(x) x.d[1]
 #define DIMS_W(x) x.d[2]
 
-#elif NV_TENSORRT_MAJOR > 1
+#elif NV_TENSORRT_MAJOR >= 2
 typedef nvinfer1::DimsCHW Dims3;
 
 #define DIMS_C(x) x.d[0]
@@ -63,6 +65,12 @@ typedef nvinfer1::Dims3 Dims3;
 #define NV_TENSORRT_MAJOR 1
 #define NV_TENSORRT_MINOR 0
 #endif
+#endif
+
+#if NV_TENSORRT_MAJOR >= 8
+#define NOEXCEPT noexcept
+#else
+#define NOEXCEPT
 #endif
 
 
@@ -563,10 +571,17 @@ protected:
 	/**
 	 * Configure builder options
 	 */
+#if NV_TENSORRT_MAJOR >= 8
+	bool ConfigureBuilder( nvinfer1::IBuilder* builder, nvinfer1::IBuilderConfig* config,  
+					   uint32_t maxBatchSize, uint32_t workspaceSize, precisionType precision, 
+					   deviceType device, bool allowGPUFallback, 
+					   nvinfer1::IInt8Calibrator* calibrator );
+#else	 
 	bool ConfigureBuilder( nvinfer1::IBuilder* builder, uint32_t maxBatchSize, 
 					   uint32_t workspaceSize, precisionType precision, 
 					   deviceType device, bool allowGPUFallback, 
 					   nvinfer1::IInt8Calibrator* calibrator );
+#endif
 
 	/**
 	 * Logger class for GIE info/warning/errors
@@ -574,18 +589,26 @@ protected:
 	class Logger : public nvinfer1::ILogger			
 	{
 	public:
-		void log( Severity severity, const char* msg ) override
+		void log( Severity severity, const char* msg ) NOEXCEPT override
 		{
 			if( severity == Severity::kWARNING )
+			{
 				LogWarning(LOG_TRT "%s\n", msg);
+			}
 			else if( severity == Severity::kINFO )
+			{
 				LogInfo(LOG_TRT "%s\n", msg);
-		#if NV_TENSORRT_MAJOR > 5
+			}
+		#if NV_TENSORRT_MAJOR >= 6
 			else if( severity == Severity::kVERBOSE )
+			{
 				LogVerbose(LOG_TRT "%s\n", msg);
+			}
 		#endif
 			else
+			{
 				LogError(LOG_TRT "%s\n", msg);
+			}
 		}
 	} static gLogger;
 
@@ -597,7 +620,7 @@ protected:
 	public:
 		Profiler() : timingAccumulator(0.0f)	{ }
 		
-		virtual void reportLayerTime(const char* layerName, float ms)
+		virtual void reportLayerTime(const char* layerName, float ms) NOEXCEPT
 		{
 			LogVerbose(LOG_TRT "layer %s - %f ms\n", layerName, ms);
 			timingAccumulator += ms;

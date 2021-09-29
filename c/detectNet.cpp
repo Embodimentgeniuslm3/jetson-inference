@@ -110,7 +110,17 @@ bool detectNet::init( const char* prototxt, const char* model, const char* mean_
 	
 	// ONNX SSD models require larger workspace size
 	if( modelTypeFromPath(model) == MODEL_ONNX )
-		mWorkspaceSize = 2048 << 20;
+	{
+		size_t gpuMemFree = 0;
+		size_t gpuMemTotal = 0;
+		
+		CUDA(cudaMemGetInfo(&gpuMemFree, &gpuMemTotal));
+
+		if( gpuMemTotal <= (2048 << 20) )
+			mWorkspaceSize = 512 << 20;
+		else
+			mWorkspaceSize = 2048 << 20;
+	}
 
 	// load the model
 	if( !LoadNetwork(prototxt, model, mean_binary, input_blob, output_blobs, 
@@ -366,6 +376,9 @@ detectNet* detectNet::Create( const commandLine& cmdLine )
 			if( !out_cvg )  out_cvg  = DETECTNET_DEFAULT_COVERAGE;
 			if( !out_bbox ) out_bbox = DETECTNET_DEFAULT_BBOX;
 		}
+
+		if( !class_labels )
+			class_labels = cmdLine.GetString("labels");
 
 		float meanPixel = cmdLine.GetFloat("mean_pixel");
 
@@ -633,19 +646,6 @@ bool detectNet::loadClassInfo( const char* filename )
 }
 
 
-#if 0
-inline static bool rectOverlap(const float6& r1, const float6& r2)
-{
-    return ! ( r2.x > r1.z  
-        || r2.z < r1.x
-        || r2.y > r1.w
-        || r2.w < r1.y
-        );
-}
-#endif
-
-
-
 // Detect
 int detectNet::Detect( float* input, uint32_t width, uint32_t height, Detection** detections, uint32_t overlay )
 {
@@ -686,7 +686,7 @@ int detectNet::Detect( void* input, uint32_t width, uint32_t height, imageFormat
 		return -1;
 	}
 
-	if( format != IMAGE_RGB8 && format != IMAGE_RGBA8 && format != IMAGE_RGB32F && format != IMAGE_RGBA32F )
+	if( !imageFormatIsRGB(format) )
 	{
 		LogError(LOG_TRT "detectNet::Detect() -- unsupported image format (%s)\n", imageFormatToStr(format));
 		LogError(LOG_TRT "                       supported formats are:\n");
@@ -695,7 +695,7 @@ int detectNet::Detect( void* input, uint32_t width, uint32_t height, imageFormat
 		LogError(LOG_TRT "                          * rgb32f\n");		
 		LogError(LOG_TRT "                          * rgba32f\n");
 
-		return false;
+		return -1;
 	}
 
 	PROFILER_BEGIN(PROFILER_PREPROCESS);
@@ -721,7 +721,7 @@ int detectNet::Detect( void* input, uint32_t width, uint32_t height, imageFormat
 									   GetStream())) )
 		{
 			LogError(LOG_TRT "detectNet::Detect() -- cudaTensorNormMeanRGB() failed\n");
-			return false;
+			return -1;
 		}
 	}
 	else
@@ -1048,6 +1048,24 @@ bool detectNet::Overlay( void* input, void* output, uint32_t width, uint32_t hei
 		return false;
 	}
 
+	// if input and output are different images, copy the input to the output first
+	// then overlay the bounding boxes, ect. on top of the output image
+	if( input != output )
+	{
+		if( CUDA_FAILED(cudaMemcpy(output, input, imageFormatSize(format, width, height), cudaMemcpyDeviceToDevice)) )
+		{
+			LogError(LOG_TRT "detectNet -- Overlay() failed to copy input image to output image\n");
+			return false;
+		}
+	}
+
+	// make sure there are actually detections
+	if( numDetections <= 0 )
+	{
+		PROFILER_END(PROFILER_VISUALIZE);
+		return true;
+	}
+
 	// bounding box overlay
 	if( flags & OVERLAY_BOX )
 	{
@@ -1099,7 +1117,7 @@ bool detectNet::Overlay( void* input, void* output, uint32_t width, uint32_t hei
 			}
 		}
 
-		font->OverlayText(input, format, width, height, labels, make_float4(255,255,255,255));
+		font->OverlayText(output, format, width, height, labels, make_float4(255,255,255,255));
 	}
 	
 	PROFILER_END(PROFILER_VISUALIZE);
@@ -1111,20 +1129,23 @@ bool detectNet::Overlay( void* input, void* output, uint32_t width, uint32_t hei
 uint32_t detectNet::OverlayFlagsFromStr( const char* str_user )
 {
 	if( !str_user )
-		return OVERLAY_BOX;
+		return OVERLAY_DEFAULT;
 
 	// copy the input string into a temporary array,
 	// because strok modifies the string
 	const size_t str_length = strlen(str_user);
-
+	const size_t max_length = 256;
+	
 	if( str_length == 0 )
-		return OVERLAY_BOX;
+		return OVERLAY_DEFAULT;
 
-	char* str = (char*)malloc(str_length + 1);
-
-	if( !str )
-		return OVERLAY_BOX;
-
+	if( str_length >= max_length )
+	{
+		LogError(LOG_TRT "detectNet::OverlayFlagsFromStr() overlay string exceeded max length of %zu characters ('%s')", max_length, str_user);
+		return OVERLAY_DEFAULT;
+	}
+	
+	char str[max_length];
 	strcpy(str, str_user);
 
 	// tokenize string by delimiters ',' and '|'
@@ -1132,29 +1153,25 @@ uint32_t detectNet::OverlayFlagsFromStr( const char* str_user )
 	char* token = strtok(str, delimiters);
 
 	if( !token )
-	{
-		free(str);
-		return OVERLAY_BOX;
-	}
+		return OVERLAY_DEFAULT;
 
-	// look for the tokens:  "box", "label", and "none"
+	// look for the tokens:  "box", "label", "default", and "none"
 	uint32_t flags = OVERLAY_NONE;
 
 	while( token != NULL )
 	{
-		//printf("%s\n", token);
-
 		if( strcasecmp(token, "box") == 0 )
 			flags |= OVERLAY_BOX;
 		else if( strcasecmp(token, "label") == 0 || strcasecmp(token, "labels") == 0 )
 			flags |= OVERLAY_LABEL;
 		else if( strcasecmp(token, "conf") == 0 || strcasecmp(token, "confidence") == 0 )
 			flags |= OVERLAY_CONFIDENCE;
+		else if( strcasecmp(token, "default") == 0 )
+			flags |= OVERLAY_DEFAULT;
 
 		token = strtok(NULL, delimiters);
 	}	
 
-	free(str);
 	return flags;
 }
 
